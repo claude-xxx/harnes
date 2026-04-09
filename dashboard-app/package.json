@@ -1,0 +1,13 @@
+{
+  "name": "dashboard-app-tooling",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "dashboard-app dev tooling meta-package. Hosts husky and shared git hooks under .husky/. NOT an application package, NOT an npm workspaces root. Application code lives in backend/ and frontend/, each with its own package.json. The husky prepare script intentionally cd's up to the git root (one level above) and installs hooks at dashboard-app/.husky so the .husky/ directory stays under dashboard-app/ rather than polluting the harnes/ git root, which contains unrelated content (documents/).",
+  "scripts": {
+    "prepare": "cd .. && husky dashboard-app/.husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7"
+  }
+}

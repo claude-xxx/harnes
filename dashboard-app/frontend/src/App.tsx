@@ -50,9 +50,7 @@ function App() {
         )}
         {state.status === 'success' && (
           <article data-testid="content" className="markdown-body">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {state.markdown}
-            </ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{state.markdown}</ReactMarkdown>
           </article>
         )}
       </main>

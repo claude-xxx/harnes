@@ -24,6 +24,10 @@
 - **1セッション1機能、1PR1目的**を厳守する。
 - **失敗したらコードより先にハーネスを直す**: 同じ失敗を2回踏んだら、まず該当カテゴリの core-belief に1行追記してから直す。
 - **安定した core-belief は機械化に昇格させる**: ESLint ルール、Vitest テスト、型、pre-commit hook のいずれかへ。昇格した時点で `failure-log.jsonl` の該当エントリの `status` を `promoted` にし、`promoted_to` を埋める。
+- **非自明な変更は `code-reviewer` subagent に投げる**: 変更が複数ファイルにまたがる、`backend/src/` や `frontend/src/` を触る、`docs/core-beliefs/*` や `docs/exec-plans/*` を追加・修正する、または「黄金原則を守れているか自信がない」とき。詳しくは [`docs/code-review.md`](../code-review.md) と定義ファイル `harnes/.claude/agents/code-reviewer.md`。subagent の指摘は必ずメインが評価してから採用する（盲従しない）。
+- **`AGENTS.md` は 100 行以内を維持する**（FL-004 由来）。詳細は `docs/` 配下の専用ファイル（`dev-commands.md` / `code-review.md` / `context-loading.md` 等）に切り出して、`AGENTS.md` には pointer のみを残す。
+  - 機械化済み: `scripts/check.sh` が AGENTS.md の行数を検査し、**120 行（100 行目標 + 20 行マージン）を超えると fail** する。pre-commit hook で git commit が阻止される。
+  - 100 行を超えそうになったら、新しい節を AGENTS.md に追加するのではなく、まず **どの docs/ ファイルに移すか** を考えること。新しいトピックなら新ファイルを `docs/<topic>.md` として作る。
 
 ---
 

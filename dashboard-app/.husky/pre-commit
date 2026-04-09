@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Pre-commit hook (Phase 2-C)
+#
+# Enforces the static-check loop and the BE contract tests before any commit.
+# If either step fails, the commit is aborted by git automatically (non-zero exit).
+#
+# DO NOT bypass this with `git commit --no-verify`. AGENTS.md forbids it.
+# If the hook is failing legitimately and blocks urgent work, fix the underlying
+# issue or escalate to a human — don't disable the gate.
+#
+# Note: git invokes this script with CWD = git root (harnes/), regardless of
+# where the hook file physically lives. The paths below are intentionally
+# relative to the git root, so they keep working even though this file lives
+# under dashboard-app/.husky/.
+
+set -euo pipefail
+
+echo "[pre-commit] running dashboard-app static checks..."
+bash dashboard-app/scripts/check.sh
+
+echo "[pre-commit] running backend contract tests..."
+( cd dashboard-app/backend && npm run test:run )
+
+echo "[pre-commit] OK: all checks passed."
