@@ -1,9 +1,17 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
-import { HealthSchema, ErrorSchema, ContentMarkdownSchema } from './schemas/api.js';
+import { dirname, resolve, posix } from 'node:path';
+import {
+  HealthSchema,
+  ErrorSchema,
+  ContentMarkdownSchema,
+  ContentQuerySchema,
+  FileTreeSchema,
+  type FileNode,
+} from './schemas/api.js';
+import { resolveWithinContent, InvalidPathError } from './lib/safePath.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -32,16 +40,37 @@ const contentRoute = createRoute({
   method: 'get',
   path: '/api/content',
   tags: ['content'],
-  summary: 'Get the welcome Markdown document',
+  summary: 'Get a Markdown file by relative path',
   description:
-    'Returns the contents of `backend/content/welcome.md` as raw Markdown. ' +
-    'Phase 1 wires a single fixed file; multi-file support is deferred to Phase 3.',
+    'Returns the contents of `backend/content/<path>` as raw Markdown. ' +
+    'The `path` query parameter is required and must be a forward-slash ' +
+    'relative path within `backend/content/`. Path traversal (`..`, absolute ' +
+    'paths, symlink escape) is rejected with 400.',
+  request: {
+    query: ContentQuerySchema,
+  },
   responses: {
     200: {
-      description: 'Markdown body of the welcome file',
+      description: 'Markdown body of the requested file',
       content: {
         'text/markdown': {
           schema: ContentMarkdownSchema,
+        },
+      },
+    },
+    400: {
+      description: 'Missing or invalid path',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+    404: {
+      description: 'File not found',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
         },
       },
     },
@@ -56,18 +85,117 @@ const contentRoute = createRoute({
   },
 });
 
+const filesRoute = createRoute({
+  method: 'get',
+  path: '/api/files',
+  tags: ['content'],
+  summary: 'List the content tree',
+  description:
+    'Recursively enumerates Markdown files under `backend/content/` as a tree. ' +
+    'Only `.md` files are listed. Dotfiles and symlinks escaping the content ' +
+    'directory are ignored. Paths are forward-slash relative to content root.',
+  responses: {
+    200: {
+      description: 'The file tree',
+      content: {
+        'application/json': {
+          schema: FileTreeSchema,
+        },
+      },
+    },
+    500: {
+      description: 'Failed to enumerate the content directory',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+  },
+});
+
+/**
+ * `backend/content/` を再帰的に走査して FileNode の配列を返す。
+ * - `.md` 以外は列挙しない
+ * - dotfile (`.` で始まるもの) は無視
+ * - シンボリックリンクで CONTENT_DIR の外に出るエントリは走査から除外
+ *   (resolveWithinContent が InvalidPathError を投げるのを catch する)
+ */
+async function walkContent(dirAbs: string, relDirPosix: string): Promise<FileNode[]> {
+  const entries = await readdir(dirAbs, { withFileTypes: true });
+  const nodes: FileNode[] = [];
+
+  // 安定した順序で返す: ディレクトリ先 → ファイル、それぞれ名前順
+  const sorted = [...entries].sort((a, b) => {
+    if (a.isDirectory() !== b.isDirectory()) {
+      return a.isDirectory() ? -1 : 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  for (const entry of sorted) {
+    if (entry.name.startsWith('.')) continue;
+
+    const childRel = relDirPosix === '' ? entry.name : posix.join(relDirPosix, entry.name);
+
+    // resolveWithinContent に通すことで symlink 脱出を検出
+    let safeAbs: string;
+    try {
+      safeAbs = await resolveWithinContent(CONTENT_DIR, childRel);
+    } catch {
+      // 外に出るリンクや壊れたリンクは静かにスキップ
+      continue;
+    }
+
+    if (entry.isDirectory()) {
+      const children = await walkContent(safeAbs, childRel);
+      nodes.push({
+        type: 'directory',
+        name: entry.name,
+        path: childRel,
+        children,
+      });
+    } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      nodes.push({
+        type: 'file',
+        name: entry.name,
+        path: childRel,
+      });
+    }
+  }
+
+  return nodes;
+}
+
 export const app = new OpenAPIHono();
 
 app.openapi(healthRoute, (c) => c.json({ status: 'ok' as const }, 200));
 
 app.openapi(contentRoute, async (c) => {
+  const { path: userPath } = c.req.valid('query');
   try {
-    const filePath = resolve(CONTENT_DIR, 'welcome.md');
+    const filePath = await resolveWithinContent(CONTENT_DIR, userPath);
     const text = await readFile(filePath, 'utf-8');
     return c.body(text, 200, { 'Content-Type': 'text/markdown; charset=utf-8' });
   } catch (err) {
+    if (err instanceof InvalidPathError) {
+      return c.json({ error: 'invalid path' }, 400);
+    }
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return c.json({ error: 'not found' }, 404);
+    }
     console.error('Failed to read content:', err);
     return c.json({ error: 'failed to read content' }, 500);
+  }
+});
+
+app.openapi(filesRoute, async (c) => {
+  try {
+    const root = await walkContent(CONTENT_DIR, '');
+    return c.json({ root }, 200);
+  } catch (err) {
+    console.error('Failed to enumerate content:', err);
+    return c.json({ error: 'failed to enumerate content' }, 500);
   }
 });
 

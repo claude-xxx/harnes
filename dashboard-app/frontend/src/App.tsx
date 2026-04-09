@@ -15,7 +15,7 @@ function App() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/content');
+        const res = await fetch('/api/content?path=welcome.md');
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}`);
         }
