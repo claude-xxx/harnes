@@ -67,14 +67,31 @@ dashboard-app/
 
 ## ビルド・起動・テスト・Lint
 
-> Phase 1 で実装します。コマンドが確定したらここを更新してください。
+FE と BE は別プロセスで起動します。Phase 1 では同時起動の自動化（concurrently 等）はあえて入れていません。
 
-- ビルド: TBD
-- 開発サーバー起動（FE）: TBD
-- 開発サーバー起動（BE）: TBD
-- テスト: TBD
-- Lint: TBD
-- 型チェック: TBD
+### Backend（`backend/`）
+- 開発サーバー起動: `npm run dev` （tsx watch、ポート 3001）
+- 型チェック: `npm run typecheck`
+- ビルド: `npm run build`（→ `dist/`）
+- 本番起動: `npm start`
+
+### Frontend（`frontend/`）
+- 開発サーバー起動: `npm run dev` （Vite、ポート 5173、`/api` を 3001 にプロキシ）
+- 型チェック: `npm run typecheck`
+- ビルド: `npm run build`
+- Lint: `npm run lint`（Vite scaffold が用意した eslint 設定）
+- プレビュー: `npm run preview`
+
+### 動作確認の手順（手動 / Phase 2 以降は MCP で自動化）
+1. 別ターミナルで `cd backend && npm run dev`
+2. 別ターミナルで `cd frontend && npm run dev`
+3. ブラウザで http://localhost:5173/ を開き、`backend/content/welcome.md` の内容が表示されることを確認
+
+### まだ存在しないもの
+- テスト（Vitest 等）→ Phase 2
+- Pre-commit hook → Phase 2
+- カスタム lint → Phase 2
+- カスタムサブエージェント → Phase 2
 
 ---
 

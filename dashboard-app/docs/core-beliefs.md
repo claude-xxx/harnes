@@ -30,7 +30,11 @@
 > 最初は空です。Phase 1 以降で「2回目の失敗」が起きたら、ここに具体的なルールとして追記してください。
 > 例：「Markdown レンダリングは `src/ui/markdown` の共有コンポーネント経由で行うこと。`react-markdown` を直接 import しない」
 
-（追記領域）
+### Phase 1 で確立されたルール
+
+- **BE は ESM (`"type": "module"`) を必須とする**。`npm init -y` が生成する commonjs は採用しない。
+- **FE → BE の通信は Vite の `server.proxy` 経由で `/api` に統一する**。CORS 設定や絶対 URL を FE に書かない。
+- **FE は BE の HTTP API のみを介して Markdown を取得する**。FE から直接ファイルシステムに触れる経路（Node API, fs 等）を作らない。
 
 ---
 
@@ -39,4 +43,5 @@
 > エージェント or 人間が踏んだ失敗のうち、**仕組み化に値するもの**を記録します。
 > 形式: `- [日付] 状況 / 原因 / 取った対策 / リンタ等への昇格状態`
 
-（追記領域）
+- **[2026-04-09]** Windows + Git Bash で dev サーバをバックグラウンド起動した際、`kill <pid>` で止まらなかった。/ 原因: bash の `&` が返す PID は subshell の PID で、実際の node プロセスは子孫 PID にある / 対策: `netstat -ano | grep LISTEN` で listening PID を引いて `taskkill //PID <pid> //F //T` で止める / 昇格: 未（再発したら停止スクリプトを `scripts/` に置く）
+- **[2026-04-09]** Phase 1 では UI レンダリングの正しさを自動検証する手段がなく、curl による HTML/プロキシ経路の疎通確認までしかできなかった / 原因: Chrome DevTools MCP が未接続 / 対策: 既知のリスクとして exec-plan に明示し、Phase 2 で MCP 接続後に正式な UI 検証を行う / 昇格: Phase 2 の DoD に組み込み済み
