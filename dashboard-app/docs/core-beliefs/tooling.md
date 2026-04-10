@@ -12,7 +12,7 @@
   - 設定ファイルの場所: `dashboard-app/` 直下に `.prettierrc.json` / `.prettierignore`、各パッケージに `eslint.config.js`。
 
 - **静的検証とテストは pre-commit hook で git に強制される**（Phase 2-C で昇格済み）。
-  - `dashboard-app/package.json` が husky を持ち、`dashboard-app/.husky/pre-commit` が `dashboard-app/scripts/check.sh` と `dashboard-app/backend` の `npm run test:run` を順に実行する。
+  - `dashboard-app/package.json` が husky を持ち、`dashboard-app/.husky/pre-commit` が `dashboard-app/scripts/check.sh` と `dashboard-app/backend` + `dashboard-app/frontend` 両方の `npm run test:run` を順に実行する。
   - hook を有効化するには **新規 clone 後、`dashboard-app/` で `npm install` を一度実行**する必要がある。`dashboard-app/package.json` の `prepare` script が `cd .. && husky dashboard-app/.husky` を呼び、git root から見て `core.hooksPath` を `dashboard-app/.husky/_` に設定する（husky 公式の subdirectory パターン）。
   - **`git commit --no-verify` での回避は禁止**（`AGENTS.md` で明示）。失敗の根本原因を直すか、ハーネス側を直すこと。
   - hook 内では **自動修正（`prettier --write` 等）を走らせない**。失敗させて人間/エージェントが直す方が、変更内容の透明性を保てる。

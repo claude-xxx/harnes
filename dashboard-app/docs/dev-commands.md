@@ -8,7 +8,7 @@
 
 - **静的検証一括: `bash scripts/check.sh`**
   - BE/FE 両方の `lint → typecheck → format:check` を順に走らせ、最後に AGENTS.md の行数ガード（FL-004 由来、120 行超で fail）を確認します。
-- **`git commit` のたびに pre-commit hook が `scripts/check.sh` と `backend` の `npm run test:run` を自動で走らせます**（Phase 2-C で導入）。
+- **`git commit` のたびに pre-commit hook が `scripts/check.sh` と `backend` + `frontend` 両方の `npm run test:run` を自動で走らせます**（Phase 2-C で導入、FE テストは Phase 3 後に追加）。
   - 失敗した commit は自動的に拒否されます。
   - **`--no-verify` での回避は禁止**（AGENTS.md の禁止コマンド参照）。
 - **新規 clone 後の最初の 1 歩**: `dashboard-app/` で `npm install` を一度だけ走らせる → husky の `prepare` script が `dashboard-app/.husky/` に hooks を配置し、git の `core.hooksPath` を `dashboard-app/.husky/_` に設定します。
@@ -47,7 +47,9 @@
 | パス | 内容 |
 | --- | --- |
 | `GET /api/health` | liveness probe |
-| `GET /api/content` | `welcome.md` を `text/markdown` で返す |
+| `GET /api/content?path=<rel>` | 指定パスの Markdown を `text/markdown` で返す |
+| `GET /api/files` | `backend/content/` のファイルツリーを JSON で返す |
+| `GET /api/search?q=<keyword>` | 全 `.md` を case-insensitive grep し結果を JSON で返す |
 | `GET /api/openapi.json` | Zod スキーマから自動生成された OpenAPI 3.1 spec |
 | `GET /api/doc` | Swagger UI（`/api/openapi.json` を読む、HTML 配信のため raw `app.get()` 例外） |
 
@@ -95,7 +97,7 @@ taskkill //PID <listening_pid> //F //T
 
 ## まだ存在しないもの（バックログ）
 
-- **FE テスト（Vitest など）** → Phase 2 後半 or 別フェーズ
+- ~~FE テスト（Vitest など）~~ → **導入済み**（Vitest + jsdom + @testing-library/react、pre-commit hook で強制）
 - **ブラウザでの UI 回帰テスト（Playwright）** → **Phase 2-G として将来導入予定**
   - 背景: Phase 2-E では Chrome DevTools MCP で UI ループを 1 周回したが、**MCP はエージェント駆動の対話ツール**であって、commit 時に自動で走る「テスト」にはできない（CLI から MCP は呼べない）。
   - 解決方針: Playwright を別レイヤとして導入し、`dashboard-app/tests/ui/` 配下に **HTTP 契約テストでは届かないレンダリング層の回帰テスト** を置く。pre-commit hook には入れず（重い）、`npm run test:ui` として明示起動 + 将来の CI で実行する想定。
