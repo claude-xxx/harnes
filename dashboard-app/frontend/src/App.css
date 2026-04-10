@@ -1,5 +1,5 @@
 .app {
-  max-width: 880px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 32px 24px 80px;
   font-family:
@@ -7,6 +7,7 @@
   color: #1f2328;
   background: #ffffff;
   min-height: 100vh;
+  text-align: left;
 }
 
 .app-header {
@@ -29,6 +30,70 @@
 
 .error {
   color: #cf222e;
+}
+
+.app-layout {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+.app-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  border-right: 1px solid #d0d7de;
+  padding-right: 16px;
+  position: sticky;
+  top: 32px;
+}
+
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-tree ul {
+  list-style: none;
+  padding-left: 14px;
+  margin: 4px 0;
+}
+
+.file-tree > ul {
+  padding-left: 0;
+}
+
+.file-tree .node-label {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 4px 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
+  color: #24292f;
+}
+
+.file-tree button.node-label:hover {
+  background: #f6f8fa;
+}
+
+.file-tree .node-label.selected {
+  background: #ddf4ff;
+  color: #0969da;
+  font-weight: 600;
+}
+
+.file-tree .node-directory > .node-label {
+  cursor: default;
+  color: #656d76;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 8px 2px;
 }
 
 .markdown-body {

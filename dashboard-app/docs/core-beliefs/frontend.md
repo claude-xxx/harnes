@@ -23,9 +23,15 @@
 
   失敗時は `list_console_messages` を絞らずに全件取って原因切り分け。スクショを取りたいときだけ `take_screenshot`（`filePath` を指定するとファイル保存も可能）。
 
-候補（昇格前のたたき台）:
-- Markdown レンダリングは `react-markdown + remark-gfm` を経由する。直接 DOM に Markdown 文字列を埋め込まない。
-- API 通信は `/api` 相対パスのみ使う。絶対 URL（`http://localhost:3001/...`）を書かない。
+- **Markdown レンダリングは `react-markdown + remark-gfm` を経由する。** 直接 DOM に Markdown 文字列を埋め込まない (`dangerouslySetInnerHTML` 禁止)。Phase 3-B で 3 ファイルを切り替えて検証、候補から昇格。
+- **API 通信は `/api` 相対パスのみ使う。** 絶対 URL（`http://localhost:3001/...`）を書かない。Vite dev proxy + 将来の同一オリジン配信を両立させるため。Phase 3-B で `src/api.ts` を切り出して一箇所に集約、候補から昇格。
+- **BE API の fetch は `src/api.ts` の wrapper を経由する。** コンポーネント内で直接 `fetch('/api/...')` を書かない。URL 組み立てとエラー整形を 1 箇所に閉じ込めるため（Phase 3-B 確立）。
+- **useEffect 内で同期 setState しない（`react-hooks/set-state-in-effect` ESLint rule で強制）。** 必要なら render 時に derive する (Phase 3-B の `LoadedContent` + derive パターン参照)。ESLint で機械化済み。
+- **1 ファイル 1 functional component を守る（Phase 3-B 確立、FL-005）。**
+  - 同一ファイル内にエクスポート / 非エクスポート問わず複数の React functional component を定義しない (`<Foo />` と `<Bar />` の 2 つを書かない)。
+  - コード量が少ない場合は 1 つのコンポーネント内で完結させる。再帰が必要なら return 内の IIFE か外部ヘルパー**関数**（JSX を返すだけの純粋関数、コンポーネントではない）で表現する。`FileTree.tsx` の `(function render(list) {...})(nodes)` パターン参照。
+  - ファイルが肥大化してきたら、サブコンポーネントを新ファイルに切り出す。同一ファイル内での分割はしない。
+  - 昇格予定 (candidate): `eslint-plugin-react` の `react/no-multi-comp` ルール。まだ未導入のため現状はプロンプト + レビュー依存。
 
 ## 検討中（昇格候補）
 
