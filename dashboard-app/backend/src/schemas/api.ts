@@ -90,3 +90,35 @@ export const FileTreeSchema = z
     root: z.array(FileNodeSchema),
   })
   .openapi('FileTree');
+
+/**
+ * `/api/search` のクエリパラメータ。
+ */
+export const SearchQuerySchema = z
+  .object({
+    q: z
+      .string()
+      .min(1)
+      .openapi({
+        param: { name: 'q', in: 'query' },
+        example: 'help',
+      }),
+  })
+  .openapi('SearchQuery');
+
+export const SearchHitSchema = z
+  .object({
+    path: z.string().openapi({ example: 'commands/help.md' }),
+    title: z.string().openapi({ example: '/help — ヘルプを表示する' }),
+    matches: z
+      .array(z.string())
+      .openapi({ example: ['Claude Code の `/help` はセッション中に使える…'] }),
+  })
+  .openapi('SearchHit');
+
+export const SearchResultSchema = z
+  .object({
+    query: z.string(),
+    hits: z.array(SearchHitSchema),
+  })
+  .openapi('SearchResult');

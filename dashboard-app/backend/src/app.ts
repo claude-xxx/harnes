@@ -9,6 +9,8 @@ import {
   ContentMarkdownSchema,
   ContentQuerySchema,
   FileTreeSchema,
+  SearchQuerySchema,
+  SearchResultSchema,
   type FileNode,
 } from './schemas/api.js';
 import { resolveWithinContent, InvalidPathError } from './lib/safePath.js';
@@ -167,6 +169,71 @@ async function walkContent(dirAbs: string, relDirPosix: string): Promise<FileNod
   return nodes;
 }
 
+const searchRoute = createRoute({
+  method: 'get',
+  path: '/api/search',
+  tags: ['content'],
+  summary: 'Search content files by keyword',
+  description:
+    'Performs a case-insensitive keyword search across all Markdown files ' +
+    'in `backend/content/`. Returns file paths, titles (first `# ` heading), ' +
+    'and up to 3 matching lines per file.',
+  request: {
+    query: SearchQuerySchema,
+  },
+  responses: {
+    200: {
+      description: 'Search results (may be empty)',
+      content: {
+        'application/json': {
+          schema: SearchResultSchema,
+        },
+      },
+    },
+    400: {
+      description: 'Missing or empty query',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+    500: {
+      description: 'Failed to search content',
+      content: {
+        'application/json': {
+          schema: ErrorSchema,
+        },
+      },
+    },
+  },
+});
+
+/** ツリーからファイルの相対パスを平坦に集める */
+function collectFilePaths(nodes: FileNode[]): string[] {
+  const paths: string[] = [];
+  const walk = (ns: FileNode[]) => {
+    for (const n of ns) {
+      if (n.type === 'file') paths.push(n.path);
+      else walk(n.children);
+    }
+  };
+  walk(nodes);
+  return paths;
+}
+
+/** Markdown の最初の `# ` 見出しを取得。なければファイル名を返す */
+function extractTitle(text: string, fileName: string): string {
+  for (const line of text.split('\n')) {
+    if (line.startsWith('# ')) {
+      return line.slice(2).trim();
+    }
+  }
+  return fileName;
+}
+
+const MAX_MATCHES_PER_FILE = 3;
+
 export const app = new OpenAPIHono();
 
 app.openapi(healthRoute, (c) => c.json({ status: 'ok' as const }, 200));
@@ -196,6 +263,45 @@ app.openapi(filesRoute, async (c) => {
   } catch (err) {
     console.error('Failed to enumerate content:', err);
     return c.json({ error: 'failed to enumerate content' }, 500);
+  }
+});
+
+app.openapi(searchRoute, async (c) => {
+  const { q } = c.req.valid('query');
+  try {
+    const tree = await walkContent(CONTENT_DIR, '');
+    const filePaths = collectFilePaths(tree);
+    const queryLower = q.toLowerCase();
+
+    const hits: Array<{ path: string; title: string; matches: string[] }> = [];
+
+    for (const relPath of filePaths) {
+      const absPath = await resolveWithinContent(CONTENT_DIR, relPath);
+      const text = await readFile(absPath, 'utf-8');
+      const lines = text.split('\n');
+      const matchedLines: string[] = [];
+
+      for (const line of lines) {
+        if (line.toLowerCase().includes(queryLower)) {
+          matchedLines.push(line.trim());
+          if (matchedLines.length >= MAX_MATCHES_PER_FILE) break;
+        }
+      }
+
+      if (matchedLines.length > 0) {
+        const fileName = relPath.split('/').pop() ?? relPath;
+        hits.push({
+          path: relPath,
+          title: extractTitle(text, fileName),
+          matches: matchedLines,
+        });
+      }
+    }
+
+    return c.json({ query: q, hits }, 200);
+  } catch (err) {
+    console.error('Failed to search content:', err);
+    return c.json({ error: 'failed to search content' }, 500);
   }
 });
 

@@ -96,6 +96,81 @@
   padding: 8px 8px 2px;
 }
 
+.search-bar {
+  margin-bottom: 12px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  color: #24292f;
+  background: #f6f8fa;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #0969da;
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+  background: #ffffff;
+}
+
+.search-status {
+  font-size: 13px;
+  color: #656d76;
+  margin: 8px 0 0;
+}
+
+.search-results {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+
+.search-hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.search-hit:hover {
+  background: #f6f8fa;
+}
+
+.search-hit-title {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: #24292f;
+}
+
+.search-hit-path {
+  display: block;
+  font-size: 12px;
+  color: #656d76;
+  margin-top: 1px;
+}
+
+.search-hit-snippet {
+  display: block;
+  font-size: 12px;
+  color: #656d76;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .markdown-body {
   font-size: 16px;
   line-height: 1.6;

@@ -4,6 +4,7 @@ import {
   HealthSchema,
   ContentMarkdownSchema,
   FileTreeSchema,
+  SearchResultSchema,
   type FileNode,
 } from '../src/schemas/api.js';
 
@@ -139,6 +140,44 @@ describe('GET /api/content', () => {
   });
 });
 
+describe('GET /api/search', () => {
+  it('returns 200 with hits matching SearchResultSchema for a known keyword', async () => {
+    const res = await get('/api/search?q=help');
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    const parsed = SearchResultSchema.parse(json);
+    expect(parsed.query).toBe('help');
+    expect(parsed.hits.length).toBeGreaterThan(0);
+
+    const paths = parsed.hits.map((h) => h.path);
+    expect(paths).toContain('commands/help.md');
+  });
+
+  it('returns 200 with empty hits for a non-matching keyword', async () => {
+    const res = await get('/api/search?q=xyznonexistent999');
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    const parsed = SearchResultSchema.parse(json);
+    expect(parsed.hits).toEqual([]);
+  });
+
+  it('returns 400 when q is missing', async () => {
+    const res = await get('/api/search');
+    expect(res.status).toBe(400);
+  });
+
+  it('returns titles extracted from the first heading', async () => {
+    const res = await get('/api/search?q=%E3%82%AD%E3%83%BC%E3%83%90%E3%82%A4%E3%83%B3%E3%83%89');
+    const json = await res.json();
+    const parsed = SearchResultSchema.parse(json);
+    const tipHit = parsed.hits.find((h) => h.path === 'tips/keybindings.md');
+    expect(tipHit).toBeDefined();
+    expect(tipHit!.title).toContain('キーバインド');
+  });
+});
+
 describe('GET /api/openapi.json', () => {
   it('serves a valid OpenAPI 3.1 document covering all routes', async () => {
     const res = await get('/api/openapi.json');
@@ -156,6 +195,12 @@ describe('GET /api/openapi.json', () => {
     expect(spec.paths['/api/health']).toBeDefined();
     expect(spec.paths['/api/content']).toBeDefined();
     expect(spec.paths['/api/files']).toBeDefined();
+    expect(spec.paths['/api/search']).toBeDefined();
+
+    // /api/search の parameters に q クエリが含まれる
+    const searchParams = spec.paths['/api/search']?.get?.parameters ?? [];
+    const qParam = searchParams.find((p) => p.name === 'q' && p.in === 'query');
+    expect(qParam).toBeDefined();
 
     // /api/content の parameters に path クエリが含まれる
     const contentParams = spec.paths['/api/content']?.get?.parameters ?? [];

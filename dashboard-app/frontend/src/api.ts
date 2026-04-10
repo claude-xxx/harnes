@@ -1,4 +1,4 @@
-import type { FileTree } from './types';
+import type { FileTree, SearchResult } from './types';
 
 /**
  * BE API の薄い fetch wrapper。
@@ -25,4 +25,12 @@ export async function fetchContent(path: string): Promise<string> {
     throw new Error(`HTTP ${res.status}`);
   }
   return await res.text();
+}
+
+export async function searchContent(query: string): Promise<SearchResult> {
+  const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return (await res.json()) as SearchResult;
 }

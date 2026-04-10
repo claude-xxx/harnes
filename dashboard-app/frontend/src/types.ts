@@ -17,3 +17,14 @@ export type FileNode =
 export type FileTree = {
   root: FileNode[];
 };
+
+export type SearchHit = {
+  path: string;
+  title: string;
+  matches: string[];
+};
+
+export type SearchResult = {
+  query: string;
+  hits: SearchHit[];
+};

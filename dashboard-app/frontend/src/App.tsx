@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fetchFileTree, fetchContent } from './api';
 import type { FileNode } from './types';
 import { FileTree } from './components/FileTree';
+import { SearchBar } from './components/SearchBar';
 import './App.css';
 
 type TreeState =
@@ -26,16 +27,16 @@ function App() {
   const [tree, setTree] = useState<TreeState>({ status: 'loading' });
   const [selectedPath, setSelectedPath] = useState<string>(INITIAL_PATH);
   const [loaded, setLoaded] = useState<LoadedContent | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // 表示用 state は render 時に derive する (useEffect 内の同期 setState 回避、
-  // react-hooks/set-state-in-effect)。loaded.path と selectedPath が一致して
-  // いない間は loading 扱い。
   const content: ContentState =
     loaded && loaded.path === selectedPath
       ? loaded.status === 'success'
         ? { status: 'success', markdown: loaded.markdown }
         : { status: 'error', message: loaded.message }
       : { status: 'loading' };
+
+  const showTree = searchQuery.trim() === '';
 
   // ツリー取得（マウント時 1 回のみ）
   useEffect(() => {
@@ -79,21 +80,25 @@ function App() {
     };
   }, [selectedPath]);
 
+  const handleSearchQueryChange = useCallback((q: string) => {
+    setSearchQuery(q);
+  }, []);
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>Claude Code Dashboard</h1>
-        <p className="subtitle">Phase 3-B — sidebar tree</p>
       </header>
       <div className="app-layout">
         <aside className="app-sidebar" data-testid="sidebar">
-          {tree.status === 'loading' && <p>Loading tree…</p>}
-          {tree.status === 'error' && (
+          <SearchBar onSelect={setSelectedPath} onQueryChange={handleSearchQueryChange} />
+          {showTree && tree.status === 'loading' && <p>Loading tree…</p>}
+          {showTree && tree.status === 'error' && (
             <p className="error" data-testid="tree-error">
               Failed to load tree: {tree.message}
             </p>
           )}
-          {tree.status === 'success' && (
+          {showTree && tree.status === 'success' && (
             <FileTree nodes={tree.tree} selectedPath={selectedPath} onSelect={setSelectedPath} />
           )}
         </aside>

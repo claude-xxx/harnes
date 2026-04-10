@@ -28,6 +28,7 @@
 
 - **「`app.get()` 直書きの禁止」を ESLint で機械化する**（Phase 2-D 候補）。`no-restricted-syntax` で `OpenAPIHono` 以外のメソッド呼び出しを止めるか、`openapi()` 以外でハンドラを登録するパターンを検出する。今は core-belief とコードレビューに頼っているが、安定したら昇格させる。
 - **「`readFile` / `readdir` の第 1 引数が `resolveWithinContent` の戻り値であること」を ESLint で機械化する**。現状は core-belief + レビューに頼っているが、handler が増えてきたら昇格候補。
+- **`walkContent` を `{relPath, absPath}[]` も返す形に拡張する**。現在 `/api/search` ハンドラは `walkContent` → `collectFilePaths` → 各パスに `resolveWithinContent` を再呼出ししており、symlink stat が二重に走る。ファイル数が増えたときのパフォーマンス改善として、`walkContent` が検証済み absPath も一緒に返す形にリファクタする。現状のファイル数（3 本）では実害なし、ファイルが 20+ 本になったら着手する。
 
 ## 関連 failure-log エントリ
 
