@@ -65,6 +65,8 @@
 | `npm run format` | Prettier |
 | `npm run format:check` | Prettier 検査のみ |
 | `npm run check` | `lint → typecheck → format:check` 集約 |
+| `npm run test` | Vitest watch (jsdom + RTL) |
+| `npm run test:run` | Vitest 1-shot（pre-commit hook で実行されるのはこちら） |
 | `npm run build` | `tsc -b && vite build` |
 | `npm run preview` | ビルド成果物のプレビュー |
 

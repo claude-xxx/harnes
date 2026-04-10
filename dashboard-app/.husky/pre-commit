@@ -21,4 +21,7 @@ bash dashboard-app/scripts/check.sh
 echo "[pre-commit] running backend contract tests..."
 ( cd dashboard-app/backend && npm run test:run )
 
+echo "[pre-commit] running frontend tests..."
+( cd dashboard-app/frontend && npm run test:run )
+
 echo "[pre-commit] OK: all checks passed."

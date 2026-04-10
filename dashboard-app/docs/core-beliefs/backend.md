@@ -4,6 +4,9 @@
 
 ## 確立された原則
 
+- **TDD: 新しいエンドポイント・ユーティリティを実装する前にテストを書く（FL-007）。**
+  - API 契約テストは `tests/api.test.ts` に追加。Zod スキーマで実レスポンスを `parse()` して検証する。
+  - `npm run test:run` で Vitest が走り、pre-commit hook で強制される。
 - **API は Zod スキーマを source of truth とする。**
   - 新しいエンドポイントを追加するときは、まず `src/schemas/api.ts`（または `src/schemas/<resource>.ts`）に Zod スキーマを書く。
   - **JSON / 構造化レスポンスを返すハンドラ** は **必ず `@hono/zod-openapi` の `createRoute` + `app.openapi()` 経由**で定義する。生の `app.get()` で JSON ハンドラを直書きしない（OpenAPI spec が静かにドリフトする原因）。

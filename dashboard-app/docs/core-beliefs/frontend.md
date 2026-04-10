@@ -4,6 +4,12 @@
 
 ## 確立された原則
 
+- **TDD: 新しいコンポーネント・関数を実装する前にテストを書く（FL-007）。**
+  - テストは `frontend/tests/` に配置。`npm run test:run` で Vitest (jsdom) が走る。
+  - コンポーネントテストは `@testing-library/react` + `@testing-library/user-event` を使う。
+  - API wrapper のテストは `vi.stubGlobal('fetch', ...)` でモックする。
+  - pre-commit hook で FE テストが強制される。テストが red のまま commit はできない。
+  - 既存コンポーネント（FileTree / SearchBar / api）のテストはすでに存在する。新規コンポーネント追加時は同じパターンに従う。
 - **スタイリングは Tailwind CSS ユーティリティクラスのみで行う（FL-006）。** 手書きの CSS ファイル（`App.css` 等）は作らない。`index.css` は `@import 'tailwindcss'` とプラグイン設定のみ。Markdown レンダリングには `@tailwindcss/typography` の `prose` クラスを使う。カスタム CSS が必要になったら `index.css` の `@layer` に閉じ込め、コンポーネント固有の `.css` ファイルは作らない。
 - **UI 描画の最終確認は Chrome DevTools MCP の `take_snapshot` を一次手段にする**（Phase 2-E で導入）。
   - スクリーンショット (`take_screenshot`) は補助。a11y ツリーのテキスト diff の方がエージェントには扱いやすく、ログとしても残しやすい。
