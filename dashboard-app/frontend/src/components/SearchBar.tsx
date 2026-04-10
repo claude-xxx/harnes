@@ -5,14 +5,9 @@ import type { SearchHit } from '../types';
 /**
  * サイドバー上部の検索欄 + 検索結果リスト。
  *
- * - 入力ありの間はツリーの代わりに検索結果を表示（App 側で切り替え）
- * - 300ms debounce 後に `GET /api/search?q=...` を叩く
- * - 結果クリックで `onSelect(path)` → 右ペインに本文表示
- * - 検索欄クリアでツリーに戻る（`onQueryChange('')` → App 側で切り替え）
- *
  * 1 ファイル 1 コンポーネント (FL-005)。
- * useEffect 内の同期 setState を避け、loaded result + derive パターンを使う
- * (core-beliefs/frontend.md: react-hooks/set-state-in-effect)。
+ * LoadedSearch + derive パターン (react-hooks/set-state-in-effect 回避)。
+ * スタイリングは Tailwind CSS ユーティリティクラスのみ。
  */
 
 type SearchBarProps = {
@@ -37,7 +32,6 @@ export function SearchBar({ onSelect, onQueryChange }: SearchBarProps) {
   const [loaded, setLoaded] = useState<LoadedSearch | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Derive display state (no sync setState in effect)
   const trimmed = query.trim();
   const search: SearchState =
     trimmed === ''
@@ -48,7 +42,6 @@ export function SearchBar({ onSelect, onQueryChange }: SearchBarProps) {
           : { status: 'error', message: loaded.message }
         : { status: 'loading' };
 
-  // Debounced search effect
   useEffect(() => {
     if (trimmed === '') return;
 
@@ -82,31 +75,37 @@ export function SearchBar({ onSelect, onQueryChange }: SearchBarProps) {
   };
 
   return (
-    <div className="search-bar">
+    <div className="mb-3">
       <input
         type="search"
-        className="search-input"
+        className="w-full px-2.5 py-1.5 border border-gray-300 rounded-md text-sm bg-gray-50 focus:outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15 focus:bg-white"
         placeholder="Search…"
         value={query}
         onChange={(e) => handleChange(e.target.value)}
         aria-label="Search content"
       />
-      {search.status === 'loading' && <p className="search-status">Searching…</p>}
+      {search.status === 'loading' && <p className="text-xs text-gray-500 mt-2">Searching…</p>}
       {search.status === 'error' && (
-        <p className="search-status error">Search failed: {search.message}</p>
+        <p className="text-xs text-red-600 mt-2">Search failed: {search.message}</p>
       )}
       {search.status === 'success' && search.hits.length === 0 && (
-        <p className="search-status">No results</p>
+        <p className="text-xs text-gray-500 mt-2">No results</p>
       )}
       {search.status === 'success' && search.hits.length > 0 && (
-        <ul className="search-results">
+        <ul className="list-none p-0 mt-2">
           {search.hits.map((hit) => (
             <li key={hit.path}>
-              <button type="button" className="search-hit" onClick={() => onSelect(hit.path)}>
-                <span className="search-hit-title">{hit.title}</span>
-                <span className="search-hit-path">{hit.path}</span>
+              <button
+                type="button"
+                className="block w-full text-left p-2 border-none bg-transparent rounded cursor-pointer font-sans hover:bg-gray-100"
+                onClick={() => onSelect(hit.path)}
+              >
+                <span className="block text-sm font-semibold text-gray-800">{hit.title}</span>
+                <span className="block text-xs text-gray-500 mt-px">{hit.path}</span>
                 {hit.matches.length > 0 && (
-                  <span className="search-hit-snippet">{hit.matches[0]}</span>
+                  <span className="block text-xs text-gray-500 mt-1 truncate">
+                    {hit.matches[0]}
+                  </span>
                 )}
               </button>
             </li>

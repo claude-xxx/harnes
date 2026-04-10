@@ -4,6 +4,7 @@
 
 ## 確立された原則
 
+- **スタイリングは Tailwind CSS ユーティリティクラスのみで行う（FL-006）。** 手書きの CSS ファイル（`App.css` 等）は作らない。`index.css` は `@import 'tailwindcss'` とプラグイン設定のみ。Markdown レンダリングには `@tailwindcss/typography` の `prose` クラスを使う。カスタム CSS が必要になったら `index.css` の `@layer` に閉じ込め、コンポーネント固有の `.css` ファイルは作らない。
 - **UI 描画の最終確認は Chrome DevTools MCP の `take_snapshot` を一次手段にする**（Phase 2-E で導入）。
   - スクリーンショット (`take_screenshot`) は補助。a11y ツリーのテキスト diff の方がエージェントには扱いやすく、ログとしても残しやすい。
   - **ループは 1 機能 1 周** で終わらせる。網羅 UI テストの代替ではない。網羅は将来 Phase 2-G の Playwright 担当（下記「検討中」参照）。

@@ -4,14 +4,8 @@ import type { FileNode } from '../types';
 /**
  * `/api/files` が返すツリーを再帰的にレンダリングするコンポーネント。
  *
- * - ディレクトリは常に展開（3-B では折りたたみを入れない、非スコープ）
- * - ファイルクリックで `onSelect(path)` を呼ぶ
- * - 選択中のファイルは `.selected` クラスでハイライト
- * - アイコンフォントや絵文字は使わない（依存を増やさない）
- *
- * 方針: 1 ファイル 1 コンポーネント。再帰は return 内の IIFE
- * (名前付き関数式 `render`) で閉じる。サブコンポーネントにも外部ヘルパーにも
- * 切り出さない。コード量がこの程度なら十分読める。
+ * 1 ファイル 1 コンポーネント (FL-005)。再帰は return 内の IIFE で閉じる。
+ * スタイリングは Tailwind CSS ユーティリティクラスのみ。
  */
 
 type FileTreeProps = {
@@ -22,15 +16,17 @@ type FileTreeProps = {
 
 export function FileTree({ nodes, selectedPath, onSelect }: FileTreeProps) {
   return (
-    <nav className="file-tree" aria-label="Content tree">
+    <nav aria-label="Content tree">
       {(function render(list: FileNode[]): ReactNode {
         return (
-          <ul>
+          <ul className="list-none pl-3.5 my-1 first:pl-0">
             {list.map((node) => {
               if (node.type === 'directory') {
                 return (
-                  <li key={node.path} className="node-directory">
-                    <div className="node-label">{node.name}</div>
+                  <li key={node.path}>
+                    <div className="px-2 pt-2 pb-0.5 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      {node.name}
+                    </div>
                     {render(node.children)}
                   </li>
                 );
@@ -39,10 +35,14 @@ export function FileTree({ nodes, selectedPath, onSelect }: FileTreeProps) {
               if (node.type === 'file') {
                 const isSelected = node.path === selectedPath;
                 return (
-                  <li key={node.path} className="node-file">
+                  <li key={node.path}>
                     <button
                       type="button"
-                      className={`node-label ${isSelected ? 'selected' : ''}`}
+                      className={`block w-full text-left px-2 py-1 rounded text-sm cursor-pointer border-none font-sans ${
+                        isSelected
+                          ? 'bg-blue-100 text-blue-700 font-semibold'
+                          : 'bg-transparent text-gray-800 hover:bg-gray-100'
+                      }`}
                       aria-current={isSelected ? 'page' : undefined}
                       onClick={() => onSelect(node.path)}
                     >
@@ -52,8 +52,6 @@ export function FileTree({ nodes, selectedPath, onSelect }: FileTreeProps) {
                 );
               }
 
-              // Exhaustive check: BE の FileNode に新しい `type` が増えたら
-              // ここでコンパイルエラーになる。黙って fallthrough しない。
               const _exhaustive: never = node;
               return _exhaustive;
             })}

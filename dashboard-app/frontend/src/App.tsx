@@ -5,7 +5,6 @@ import { fetchFileTree, fetchContent } from './api';
 import type { FileNode } from './types';
 import { FileTree } from './components/FileTree';
 import { SearchBar } from './components/SearchBar';
-import './App.css';
 
 type TreeState =
   | { status: 'loading' }
@@ -38,7 +37,6 @@ function App() {
 
   const showTree = searchQuery.trim() === '';
 
-  // ツリー取得（マウント時 1 回のみ）
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -59,7 +57,6 @@ function App() {
     };
   }, []);
 
-  // 本文取得（selectedPath が変わるたびに）
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -85,16 +82,21 @@ function App() {
   }, []);
 
   return (
-    <div className="app">
-      <header className="app-header">
-        <h1>Claude Code Dashboard</h1>
+    <div className="mx-auto max-w-5xl min-h-screen px-6 py-8 font-sans text-gray-800">
+      <header className="border-b border-gray-300 pb-4 mb-8">
+        <h1 className="text-3xl font-bold m-0">Claude Code Dashboard</h1>
       </header>
-      <div className="app-layout">
-        <aside className="app-sidebar" data-testid="sidebar">
+      <div className="flex gap-8 items-start">
+        <aside
+          className="w-64 shrink-0 border-r border-gray-300 pr-4 sticky top-8"
+          data-testid="sidebar"
+        >
           <SearchBar onSelect={setSelectedPath} onQueryChange={handleSearchQueryChange} />
-          {showTree && tree.status === 'loading' && <p>Loading tree…</p>}
+          {showTree && tree.status === 'loading' && (
+            <p className="text-sm text-gray-500">Loading tree…</p>
+          )}
           {showTree && tree.status === 'error' && (
-            <p className="error" data-testid="tree-error">
+            <p className="text-red-600 text-sm" data-testid="tree-error">
               Failed to load tree: {tree.message}
             </p>
           )}
@@ -102,15 +104,19 @@ function App() {
             <FileTree nodes={tree.tree} selectedPath={selectedPath} onSelect={setSelectedPath} />
           )}
         </aside>
-        <main className="app-main">
-          {content.status === 'loading' && <p data-testid="loading">Loading…</p>}
+        <main className="flex-1 min-w-0">
+          {content.status === 'loading' && (
+            <p data-testid="loading" className="text-gray-500">
+              Loading…
+            </p>
+          )}
           {content.status === 'error' && (
-            <p data-testid="error" className="error">
+            <p data-testid="error" className="text-red-600">
               Failed to load content: {content.message}
             </p>
           )}
           {content.status === 'success' && (
-            <article data-testid="content" className="markdown-body">
+            <article data-testid="content" className="prose prose-gray max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{content.markdown}</ReactMarkdown>
             </article>
           )}
