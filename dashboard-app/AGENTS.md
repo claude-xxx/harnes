@@ -58,25 +58,24 @@ dashboard-app/
 
 ---
 
-## 開発フロー（厳守）
+## 開発フロー（厳守）— 3 エージェント + Orchestrator + Reviewer
 
-`Explore → Plan → Implement → Verify → Record` を守ること:
+メインエージェントは **Orchestrator** として振る舞い、順に呼び出す:
 
-1. **Explore**: 関連コードと `docs/` を読む（[`docs/context-loading.md`](docs/context-loading.md) 参照）
-2. **Plan**: `docs/exec-plans/active/<task>.md` に実行計画を書く
-3. **Implement**: **1 セッション 1 機能、1 PR 1 目的**
-4. **Verify**: `bash scripts/check.sh` + 必要に応じて MCP UI 検証 + `code-reviewer` subagent
-5. **Record**: 完了したら exec-plan を `completed/` へ、`core-beliefs/<category>.md` に黄金原則を追記、必要なら `failure-log.jsonl` に新規 JSON を append
+1. **Planner** → 仕様 + 受入基準（AC は Happy/Edge/A11y/Error の 4 カテゴリ必須、HOW 禁止）
+2. **ユーザー承認** → Orchestrator が仕様を提示、人間がレビュー
+3. **Generator** → TDD で実装（AC 不変、ブラウザ操作しない）
+4. **Evaluator** → MCP で AC 検証（コード非参照）→ fail なら批判を Generator へ（最大 5 回）
+5. **Code Review（必須 2 周目）** → Evaluator pass 後に `code-reviewer` を必ず呼ぶ。`blocking`/`major` があれば Generator へ差戻し、`minor`/`nit` は Orchestrator 判断
+6. **Record** → verdict=clean 後に commit、exec-plan を `completed/` へ
+
+詳細: [`docs/exec-plans/active/phase5-multi-agent-harness.md`](docs/exec-plans/active/phase5-multi-agent-harness.md)
 
 ---
 
-## ハーネスのフィードバックループ（5 種、詳細は各 pointer）
+## ハーネスのフィードバックループ
 
-- **静的検証**: `bash scripts/check.sh`（lint + typecheck + format + AGENTS.md 行数ガード）→ [`docs/dev-commands.md`](docs/dev-commands.md)
-- **API 契約テスト**: `cd backend && npm run test:run`（Vitest, Zod スキーマで実レスポンスを parse）→ 同上
-- **pre-commit hook**: 上記 2 つを `git commit` 時に強制（husky）→ 同上
-- **UI 検証**: Chrome DevTools MCP の `take_snapshot` を一次手段に → [`docs/core-beliefs/frontend.md`](docs/core-beliefs/frontend.md)
-- **コードレビュー**: `code-reviewer` subagent（読み取り専用、core-beliefs 違反検出）→ [`docs/code-review.md`](docs/code-review.md)
+GAN / 静的検証 / テスト / UI 検証 / ドリフト検出の 5 本で構成。詳細は [`docs/feedback-loops.md`](docs/feedback-loops.md)。
 
 ---
 
