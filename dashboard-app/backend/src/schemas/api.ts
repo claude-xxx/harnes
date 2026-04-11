@@ -123,3 +123,54 @@ export const SearchResultSchema = z
     hits: z.array(SearchHitSchema),
   })
   .openapi('SearchResult');
+
+/**
+ * `/api/harness/failure-log` のレスポンス。
+ *
+ * 集計のみを返す（レコード全件リストは返さない、exec-plan 非スコープ）。
+ * `byStatus` / `byCategory` は動的なキー集合のため `z.record(z.number())` を使う。
+ */
+export const HarnessFailureLogSchema = z
+  .object({
+    byStatus: z.record(z.string(), z.number().int().nonnegative()).openapi({
+      example: { open: 2, promoted: 3 },
+    }),
+    byCategory: z.record(z.string(), z.number().int().nonnegative()).openapi({
+      example: { frontend: 1, backend: 0, infra: 0, tooling: 1, process: 3 },
+    }),
+    totalValid: z.number().int().nonnegative().openapi({ example: 5 }),
+    totalInvalid: z.number().int().nonnegative().openapi({ example: 0 }),
+  })
+  .openapi('HarnessFailureLog');
+
+export const HarnessExecPlanEntrySchema = z
+  .object({
+    file: z.string().openapi({ example: 'harness-dashboard.md' }),
+    title: z.string().openapi({ example: 'ハーネス観測ダッシュボード' }),
+    status: z.string().nullable().openapi({ example: 'planned' }),
+    createdAt: z.string().nullable().openapi({ example: '2026-04-12' }),
+    completedAt: z.string().nullable().openapi({ example: null }),
+  })
+  .openapi('HarnessExecPlanEntry');
+
+export const HarnessExecPlansSchema = z
+  .object({
+    active: z.array(HarnessExecPlanEntrySchema),
+    completed: z.array(HarnessExecPlanEntrySchema),
+  })
+  .openapi('HarnessExecPlans');
+
+export const HarnessCoreBeliefEntrySchema = z
+  .object({
+    file: z.string().openapi({ example: 'frontend.md' }),
+    category: z.string().openapi({ example: 'frontend' }),
+    established: z.number().int().nonnegative().openapi({ example: 7 }),
+    candidates: z.number().int().nonnegative().openapi({ example: 1 }),
+  })
+  .openapi('HarnessCoreBeliefEntry');
+
+export const HarnessCoreBeliefsSchema = z
+  .object({
+    entries: z.array(HarnessCoreBeliefEntrySchema),
+  })
+  .openapi('HarnessCoreBeliefs');

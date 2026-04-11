@@ -28,3 +28,39 @@ export type SearchResult = {
   query: string;
   hits: SearchHit[];
 };
+
+/**
+ * /api/harness/* の型。BE 側の Zod スキーマ
+ * (HarnessFailureLogSchema / HarnessExecPlansSchema / HarnessCoreBeliefsSchema)
+ * と同期していること。
+ */
+export type HarnessFailureLog = {
+  byStatus: Record<string, number>;
+  byCategory: Record<string, number>;
+  totalValid: number;
+  totalInvalid: number;
+};
+
+export type HarnessExecPlanEntry = {
+  file: string;
+  title: string;
+  status: string | null;
+  createdAt: string | null;
+  completedAt: string | null;
+};
+
+export type HarnessExecPlans = {
+  active: HarnessExecPlanEntry[];
+  completed: HarnessExecPlanEntry[];
+};
+
+export type HarnessCoreBeliefEntry = {
+  file: string;
+  category: string;
+  established: number;
+  candidates: number;
+};
+
+export type HarnessCoreBeliefs = {
+  entries: HarnessCoreBeliefEntry[];
+};

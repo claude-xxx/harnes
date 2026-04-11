@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchFileTree, fetchContent, searchContent } from '../src/api';
+import {
+  fetchFileTree,
+  fetchContent,
+  searchContent,
+  fetchHarnessFailureLog,
+  fetchHarnessExecPlans,
+  fetchHarnessCoreBeliefs,
+} from '../src/api';
 
 // Global fetch のモック
 const mockFetch = vi.fn();
@@ -77,5 +84,71 @@ describe('searchContent', () => {
 
     await searchContent('キー');
     expect(mockFetch).toHaveBeenCalledWith('/api/search?q=%E3%82%AD%E3%83%BC');
+  });
+});
+
+describe('fetchHarnessFailureLog', () => {
+  it('returns parsed body on 200', async () => {
+    const body = {
+      byStatus: { open: 1 },
+      byCategory: { frontend: 1 },
+      totalValid: 1,
+      totalInvalid: 0,
+    };
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(body) });
+    const res = await fetchHarnessFailureLog();
+    expect(res).toEqual(body);
+    expect(mockFetch).toHaveBeenCalledWith('/api/harness/failure-log');
+  });
+
+  it('throws on non-ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, json: () => Promise.resolve({}) });
+    await expect(fetchHarnessFailureLog()).rejects.toThrow('HTTP 500');
+  });
+
+  it('throws on invalid shape', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    await expect(fetchHarnessFailureLog()).rejects.toThrow(/invalid response shape/);
+  });
+});
+
+describe('fetchHarnessExecPlans', () => {
+  it('returns parsed body on 200', async () => {
+    const body = { active: [], completed: [] };
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(body) });
+    const res = await fetchHarnessExecPlans();
+    expect(res).toEqual(body);
+  });
+
+  it('throws on invalid shape ({})', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    await expect(fetchHarnessExecPlans()).rejects.toThrow(/invalid response shape/);
+  });
+
+  it('throws when active is not an array', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ active: 'nope', completed: [] }),
+    });
+    await expect(fetchHarnessExecPlans()).rejects.toThrow(/invalid response shape/);
+  });
+});
+
+describe('fetchHarnessCoreBeliefs', () => {
+  it('returns parsed body on 200', async () => {
+    const body = { entries: [] };
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(body) });
+    const res = await fetchHarnessCoreBeliefs();
+    expect(res).toEqual(body);
+  });
+
+  it('throws on invalid shape', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ foo: 1 }),
+    });
+    await expect(fetchHarnessCoreBeliefs()).rejects.toThrow(/invalid response shape/);
   });
 });

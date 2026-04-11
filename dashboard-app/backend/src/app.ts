@@ -11,15 +11,28 @@ import {
   FileTreeSchema,
   SearchQuerySchema,
   SearchResultSchema,
+  HarnessFailureLogSchema,
+  HarnessExecPlansSchema,
+  HarnessCoreBeliefsSchema,
   type FileNode,
 } from './schemas/api.js';
 import { resolveWithinContent, InvalidPathError } from './lib/safePath.js';
+import {
+  aggregateFailureLog,
+  parseExecPlan,
+  aggregateCoreBeliefs,
+  type ExecPlanSummary,
+  type CoreBeliefSummary,
+} from './lib/harness.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // content/ is at backend/content (one level above src/)
 const CONTENT_DIR = resolve(__dirname, '..', 'content');
+
+// docs/ is at dashboard-app/docs (two levels above src/: src/ -> backend/ -> dashboard-app/)
+const DOCS_DIR = resolve(__dirname, '..', '..', 'docs');
 
 const healthRoute = createRoute({
   method: 'get',
@@ -304,6 +317,178 @@ app.openapi(searchRoute, async (c) => {
   } catch (err) {
     console.error('Failed to search content:', err);
     return c.json({ error: 'failed to search content' }, 500);
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/*                     /api/harness/* endpoints                        */
+/* ------------------------------------------------------------------ */
+
+const harnessFailureLogRoute = createRoute({
+  method: 'get',
+  path: '/api/harness/failure-log',
+  tags: ['harness'],
+  summary: 'Failure log aggregation',
+  description:
+    'Reads docs/failure-log.jsonl and returns counts aggregated by status and category. ' +
+    'Malformed JSON lines are skipped silently.',
+  responses: {
+    200: {
+      description: 'Aggregated failure log counts',
+      content: { 'application/json': { schema: HarnessFailureLogSchema } },
+    },
+    500: {
+      description: 'Failed to read or aggregate the failure log',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
+const harnessExecPlansRoute = createRoute({
+  method: 'get',
+  path: '/api/harness/exec-plans',
+  tags: ['harness'],
+  summary: 'Exec plans summary',
+  description:
+    "Walks docs/exec-plans/active/ and docs/exec-plans/completed/ and returns each plan's " +
+    'title, status, creation date, and completion date (when present).',
+  responses: {
+    200: {
+      description: 'Exec plan entries grouped by active / completed',
+      content: { 'application/json': { schema: HarnessExecPlansSchema } },
+    },
+    500: {
+      description: 'Failed to walk the exec-plans directory',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
+const harnessCoreBeliefsRoute = createRoute({
+  method: 'get',
+  path: '/api/harness/core-beliefs',
+  tags: ['harness'],
+  summary: 'Core beliefs summary',
+  description:
+    'Walks docs/core-beliefs/*.md and returns per-file counts of established principles and ' +
+    'promotion candidates (top-level bullets under the respective sections).',
+  responses: {
+    200: {
+      description: 'Per-file core-belief counts',
+      content: { 'application/json': { schema: HarnessCoreBeliefsSchema } },
+    },
+    500: {
+      description: 'Failed to walk the core-beliefs directory',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
+/** ENOENT を empty として扱いつつ、それ以外は呼び出し元に投げる readdir wrapper */
+async function readdirOrEmpty(absDir: string): Promise<string[]> {
+  try {
+    const entries = await readdir(absDir, { withFileTypes: true });
+    return entries.filter((e) => e.isFile() && e.name.endsWith('.md')).map((e) => e.name);
+  } catch (err) {
+    if (err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return [];
+    }
+    throw err;
+  }
+}
+
+app.openapi(harnessFailureLogRoute, async (c) => {
+  try {
+    // resolveWithinContent は realpath を呼ぶため存在しないパスで ENOENT を throw する。
+    // exec-plans / core-beliefs ハンドラと同じく ENOENT を空入力として扱い、
+    // 集計結果が常に一本道 (aggregateFailureLog(text)) になるようにする。
+    let text = '';
+    try {
+      const absPath = await resolveWithinContent(DOCS_DIR, 'failure-log.jsonl');
+      text = await readFile(absPath, 'utf-8');
+    } catch (err) {
+      if (
+        !(err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT')
+      ) {
+        throw err;
+      }
+    }
+    const agg = aggregateFailureLog(text);
+    return c.json(agg, 200);
+  } catch (err) {
+    console.error('Failed to aggregate failure log:', err);
+    return c.json({ error: 'failed to aggregate failure log' }, 500);
+  }
+});
+
+app.openapi(harnessExecPlansRoute, async (c) => {
+  try {
+    const loadGroup = async (group: 'active' | 'completed'): Promise<ExecPlanSummary[]> => {
+      const relDir = posix.join('exec-plans', group);
+      // 静的 traversal check（ディレクトリ自体の検証）
+      let absDir: string;
+      try {
+        absDir = await resolveWithinContent(DOCS_DIR, relDir);
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          'code' in err &&
+          (err as NodeJS.ErrnoException).code === 'ENOENT'
+        ) {
+          return [];
+        }
+        throw err;
+      }
+      const names = await readdirOrEmpty(absDir);
+      names.sort((a, b) => a.localeCompare(b));
+      const entries: ExecPlanSummary[] = [];
+      for (const name of names) {
+        const rel = posix.join(relDir, name);
+        const fileAbs = await resolveWithinContent(DOCS_DIR, rel);
+        const text = await readFile(fileAbs, 'utf-8');
+        entries.push(parseExecPlan(text, name));
+      }
+      return entries;
+    };
+
+    const active = await loadGroup('active');
+    const completed = await loadGroup('completed');
+    return c.json({ active, completed }, 200);
+  } catch (err) {
+    console.error('Failed to load exec-plans:', err);
+    return c.json({ error: 'failed to load exec-plans' }, 500);
+  }
+});
+
+app.openapi(harnessCoreBeliefsRoute, async (c) => {
+  try {
+    let absDir: string;
+    try {
+      absDir = await resolveWithinContent(DOCS_DIR, 'core-beliefs');
+    } catch (err) {
+      if (
+        err instanceof Error &&
+        'code' in err &&
+        (err as NodeJS.ErrnoException).code === 'ENOENT'
+      ) {
+        return c.json({ entries: [] }, 200);
+      }
+      throw err;
+    }
+    const names = await readdirOrEmpty(absDir);
+    names.sort((a, b) => a.localeCompare(b));
+    const entries: Array<CoreBeliefSummary & { file: string }> = [];
+    for (const name of names) {
+      const rel = posix.join('core-beliefs', name);
+      const fileAbs = await resolveWithinContent(DOCS_DIR, rel);
+      const text = await readFile(fileAbs, 'utf-8');
+      const summary = aggregateCoreBeliefs(text, name);
+      entries.push({ file: name, ...summary });
+    }
+    return c.json({ entries }, 200);
+  } catch (err) {
+    console.error('Failed to load core-beliefs:', err);
+    return c.json({ error: 'failed to load core-beliefs' }, 500);
   }
 });
 
