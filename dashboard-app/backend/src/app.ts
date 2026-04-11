@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute } from '@hono/zod-openapi';
 import { swaggerUI } from '@hono/swagger-ui';
-import { readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve, posix } from 'node:path';
 import {
@@ -158,10 +158,12 @@ async function walkContent(dirAbs: string, relDirPosix: string): Promise<FileNod
         children,
       });
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      const fileStat = await stat(safeAbs);
       nodes.push({
         type: 'file',
         name: entry.name,
         path: childRel,
+        modifiedAt: fileStat.mtime.toISOString(),
       });
     }
   }

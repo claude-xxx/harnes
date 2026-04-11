@@ -8,6 +8,17 @@ import type { FileNode } from '../types';
  * スタイリングは Tailwind CSS ユーティリティクラスのみ。
  */
 
+/** ISO 8601 日時文字列をローカルタイムゾーンの YYYY/MM/DD HH:mm 形式に変換する */
+function formatModifiedAt(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  const h = String(d.getHours()).padStart(2, '0');
+  const min = String(d.getMinutes()).padStart(2, '0');
+  return `${y}/${m}/${day} ${h}:${min}`;
+}
+
 type FileTreeProps = {
   nodes: FileNode[];
   selectedPath: string;
@@ -34,6 +45,7 @@ export function FileTree({ nodes, selectedPath, onSelect }: FileTreeProps) {
 
               if (node.type === 'file') {
                 const isSelected = node.path === selectedPath;
+                const formattedDate = formatModifiedAt(node.modifiedAt);
                 return (
                   <li key={node.path}>
                     <button
@@ -48,6 +60,12 @@ export function FileTree({ nodes, selectedPath, onSelect }: FileTreeProps) {
                     >
                       {node.name}
                     </button>
+                    <span
+                      data-testid="file-modified-at"
+                      className="block px-2 text-xs text-gray-400 leading-tight"
+                    >
+                      {formattedDate}
+                    </span>
                   </li>
                 );
               }

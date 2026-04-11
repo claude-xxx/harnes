@@ -11,7 +11,7 @@
  */
 
 export type FileNode =
-  | { type: 'file'; name: string; path: string }
+  | { type: 'file'; name: string; path: string; modifiedAt: string }
   | { type: 'directory'; name: string; path: string; children: FileNode[] };
 
 export type FileTree = {

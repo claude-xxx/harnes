@@ -60,7 +60,7 @@ export const ContentQuerySchema = z
  * 明示的な `FileNode` type を与えることで TS が型を決定できるようにしている。
  */
 export type FileNode =
-  | { type: 'file'; name: string; path: string }
+  | { type: 'file'; name: string; path: string; modifiedAt: string }
   | { type: 'directory'; name: string; path: string; children: FileNode[] };
 
 const FileSchema = z
@@ -68,6 +68,7 @@ const FileSchema = z
     type: z.literal('file'),
     name: z.string(),
     path: z.string(),
+    modifiedAt: z.string().datetime().openapi({ example: '2026-04-10T14:30:00.000Z' }),
   })
   .openapi('FileEntry');
 

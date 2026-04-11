@@ -62,6 +62,39 @@ describe('GET /api/files', () => {
     expect(files).toContain('tips/keybindings.md');
   });
 
+  it('includes modifiedAt (ISO 8601) on file nodes but not on directory nodes', async () => {
+    const res = await get('/api/files');
+    expect(res.status).toBe(200);
+
+    const json = await res.json();
+    const parsed = FileTreeSchema.parse(json);
+
+    // Helper to collect all nodes flat
+    function collectAll(nodes: FileNode[]): FileNode[] {
+      const out: FileNode[] = [];
+      for (const n of nodes) {
+        out.push(n);
+        if (n.type === 'directory') out.push(...collectAll(n.children));
+      }
+      return out;
+    }
+
+    const allNodes = collectAll(parsed.root);
+    let fileCount = 0;
+    for (const n of allNodes) {
+      if (n.type === 'file') {
+        // FileTreeSchema.parse() が throw しなければ modifiedAt は ISO 8601 保証済み
+        // (FileSchema.modifiedAt = z.string().datetime())。ここでは型 narrow だけで十分。
+        expect(typeof n.modifiedAt).toBe('string');
+        fileCount++;
+      } else {
+        // AC-4 (BE side): discriminated union の負側 — directory には modifiedAt が存在しない
+        expect('modifiedAt' in n).toBe(false);
+      }
+    }
+    expect(fileCount).toBeGreaterThan(0);
+  });
+
   it('lists directories before files and returns forward-slash paths', async () => {
     const res = await get('/api/files');
     const json = (await res.json()) as { root: FileNode[] };
