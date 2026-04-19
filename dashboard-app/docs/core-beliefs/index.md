@@ -30,6 +30,8 @@
   - **Evaluator** → MCP でブラウザ検証（Generator のコードは読まない = 敵対性）。fail → Generator に批判を渡してリトライ（最大 5 回）
   - **code-reviewer（必須 2 周目）** → Evaluator pass 後に必ず呼ぶ。品質軸（過剰設計 / Zod source of truth / AGENTS.md 行数 / core-beliefs 違反等）で検証し、blocking/major があれば Generator へ差戻し。Evaluator が「外形検証のみ」に専念できるのはこの段が後続にあるため
   - pass + clean → commit
+  - **差し戻し時は review-log に記録する**: code-reviewer が blocking/major を出して Generator に差し戻す際、Orchestrator は `docs/review-log.jsonl` に finding を追記する。これにより指摘パターンが蓄積され、同じミスの繰り返しを防ぐ
+  - **review-log の頻出パターンは code-reviewer に昇格する**: 同一パターンが 2 回以上記録されたら、`code-reviewer.md` の「過去の頻出指摘」セクションにチェック観点として追記し、review-log の該当エントリの `status` を `promoted` にする
   - メインエージェントは **Orchestrator** に徹し、自分で計画・実装・検証を一括で行わない
   - 詳細: `docs/feedback-loops.md` / `docs/exec-plans/active/phase5-multi-agent-harness.md`
 - **`AGENTS.md` は 100 行以内を維持する**（FL-004 由来）。詳細は `docs/` 配下の専用ファイル（`dev-commands.md` / `code-review.md` / `context-loading.md` 等）に切り出して、`AGENTS.md` には pointer のみを残す。
@@ -79,4 +81,49 @@ jq -r '.category' docs/failure-log.jsonl | sort | uniq -c
 
 # 再発回数が多い順（昇格の最有力候補）
 jq -c 'select(.recurrence | length >= 2)' docs/failure-log.jsonl
+```
+
+---
+
+## review-log.jsonl のスキーマ（**正準定義**）
+
+`docs/review-log.jsonl` は **code-reviewer の指摘を蓄積する** append-only ファイル。
+failure-log が「実害のある失敗」を記録するのに対し、review-log は「レビューで検出された品質上の問題」を記録する。
+
+### スキーマ
+
+```jsonc
+{
+  "id": "RL-001",                  // 連番。RL-NNN 形式
+  "date": "YYYY-MM-DD",            // レビュー日
+  "task": "phase5-foo",            // どの exec-plan / タスクでの指摘か
+  "category": "backend",           // frontend | backend | infra | tooling | process
+  "severity": "blocking",          // blocking | major | minor | nit
+  "title": "短い見出し",
+  "what": "何が問題だったか",
+  "why": "どの core-belief / process ルールに違反しているか",
+  "iteration": 1,                  // 何周目のレビューか
+  "status": "fixed",               // fixed | promoted | wontfix
+  "promoted_to": null              // null または昇格先 (例: "code-reviewer:F-001")
+}
+```
+
+### 書き方のルール
+
+- failure-log.jsonl と同じ JSONL 形式（1行 1 レコード、pretty-print 禁止）。
+- `id` は `RL-NNN` で単調増加。
+- **Orchestrator が差し戻し時に書く**。code-reviewer 自身は書かない（読み取り専用のため）。
+- 同一パターンが **2 回以上** 出現したら `code-reviewer.md` の「過去の頻出指摘」に昇格し、`status` を `promoted`、`promoted_to` を `code-reviewer:F-NNN` にする。
+
+### よく使うクエリ例（ターミナル）
+
+```bash
+# 未昇格の指摘を一覧
+jq -c 'select(.status=="fixed")' docs/review-log.jsonl
+
+# カテゴリ別件数
+jq -r '.category' docs/review-log.jsonl | sort | uniq -c
+
+# 同じタイトルが複数回出現 → 昇格候補
+jq -r '.title' docs/review-log.jsonl | sort | uniq -c | sort -rn
 ```
