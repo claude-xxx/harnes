@@ -143,6 +143,27 @@ export const HarnessFailureLogSchema = z
   })
   .openapi('HarnessFailureLog');
 
+/**
+ * `/api/harness/failure-log/timeline` のレスポンス。
+ *
+ * 日付別 failure 件数を昇順で返す。
+ */
+export const HarnessFailureLogTimelineEntrySchema = z
+  .object({
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .openapi({ example: '2026-04-09' }),
+    count: z.number().int().nonnegative().openapi({ example: 3 }),
+  })
+  .openapi('HarnessFailureLogTimelineEntry');
+
+export const HarnessFailureLogTimelineSchema = z
+  .object({
+    entries: z.array(HarnessFailureLogTimelineEntrySchema),
+  })
+  .openapi('HarnessFailureLogTimeline');
+
 export const HarnessExecPlanEntrySchema = z
   .object({
     file: z.string().openapi({ example: 'harness-dashboard.md' }),

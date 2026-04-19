@@ -25,6 +25,30 @@ function installFetch(handler: FetchHandler): void {
   });
 }
 
+/** Standard mock responses for all harness endpoints */
+const MOCK_FAILURE_LOG = {
+  byStatus: { open: 2, promoted: 3 },
+  byCategory: { frontend: 1, backend: 0, tooling: 1, process: 3 },
+  totalValid: 5,
+  totalInvalid: 0,
+};
+
+const MOCK_TIMELINE = {
+  entries: [
+    { date: '2026-04-09', count: 1 },
+    { date: '2026-04-10', count: 3 },
+  ],
+};
+
+const MOCK_EXEC_PLANS = {
+  active: [],
+  completed: [],
+};
+
+const MOCK_CORE_BELIEFS = {
+  entries: [],
+};
+
 function jsonResponse(body: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
@@ -50,6 +74,9 @@ beforeEach(() => {
 describe('HarnessDashboard (standalone)', () => {
   it('renders all three section headings (Failure Log / Exec Plans / Core Beliefs)', async () => {
     installFetch((url) => {
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse(MOCK_TIMELINE);
+      }
       if (url.includes('/api/harness/failure-log')) {
         return jsonResponse({
           byStatus: { open: 2, promoted: 3 },
@@ -121,14 +148,17 @@ describe('HarnessDashboard (standalone)', () => {
   // AC-R1: failure-log の取得失敗が他セクションを巻き込まない
   it('AC-R1: shows a Japanese error in Failure Log while other sections still mount', async () => {
     installFetch((url) => {
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse({ entries: [] });
+      }
       if (url.includes('/api/harness/failure-log')) {
         return jsonResponse({ error: 'boom' }, 500);
       }
       if (url.includes('/api/harness/exec-plans')) {
-        return jsonResponse({ active: [], completed: [] });
+        return jsonResponse(MOCK_EXEC_PLANS);
       }
       if (url.includes('/api/harness/core-beliefs')) {
-        return jsonResponse({ entries: [] });
+        return jsonResponse(MOCK_CORE_BELIEFS);
       }
       return jsonResponse({}, 500);
     });
@@ -152,14 +182,17 @@ describe('HarnessDashboard (standalone)', () => {
   it('AC-R1b: handles network rejection on failure-log without crashing other sections', async () => {
     mockFetch.mockImplementation((input: RequestInfo | URL) => {
       const url = typeof input === 'string' ? input : input.toString();
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return Promise.resolve(jsonResponse({ entries: [] }));
+      }
       if (url.includes('/api/harness/failure-log')) {
         return Promise.reject(new Error('network down'));
       }
       if (url.includes('/api/harness/exec-plans')) {
-        return Promise.resolve(jsonResponse({ active: [], completed: [] }));
+        return Promise.resolve(jsonResponse(MOCK_EXEC_PLANS));
       }
       if (url.includes('/api/harness/core-beliefs')) {
-        return Promise.resolve(jsonResponse({ entries: [] }));
+        return Promise.resolve(jsonResponse(MOCK_CORE_BELIEFS));
       }
       return Promise.resolve(jsonResponse({}, 500));
     });
@@ -176,20 +209,18 @@ describe('HarnessDashboard (standalone)', () => {
   // AC-R2: exec-plans が `{}` を返しても FE がクラッシュしない
   it('AC-R2: renders an error in Exec Plans section when response shape is invalid ({})', async () => {
     installFetch((url) => {
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse(MOCK_TIMELINE);
+      }
       if (url.includes('/api/harness/failure-log')) {
-        return jsonResponse({
-          byStatus: { open: 1 },
-          byCategory: { frontend: 1 },
-          totalValid: 1,
-          totalInvalid: 0,
-        });
+        return jsonResponse(MOCK_FAILURE_LOG);
       }
       if (url.includes('/api/harness/exec-plans')) {
         // 想定外 shape
         return jsonResponse({});
       }
       if (url.includes('/api/harness/core-beliefs')) {
-        return jsonResponse({ entries: [] });
+        return jsonResponse(MOCK_CORE_BELIEFS);
       }
       return jsonResponse({}, 500);
     });
@@ -206,6 +237,83 @@ describe('HarnessDashboard (standalone)', () => {
   });
 });
 
+describe('HarnessDashboard timeline section', () => {
+  /** Default fetch handler that returns all harness mocks including timeline */
+  function installAllHarnessMocks(overrides?: Partial<Record<string, unknown>>) {
+    installFetch((url) => {
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse(overrides?.timeline ?? MOCK_TIMELINE);
+      }
+      if (url.includes('/api/harness/failure-log')) {
+        return jsonResponse(overrides?.failureLog ?? MOCK_FAILURE_LOG);
+      }
+      if (url.includes('/api/harness/exec-plans')) {
+        return jsonResponse(overrides?.execPlans ?? MOCK_EXEC_PLANS);
+      }
+      if (url.includes('/api/harness/core-beliefs')) {
+        return jsonResponse(overrides?.coreBeliefs ?? MOCK_CORE_BELIEFS);
+      }
+      return jsonResponse({}, 500);
+    });
+  }
+
+  // AC-H1 + AC-A2: timeline section has a heading
+  it('AC-H1/AC-A2: renders a "Failure Log タイムライン" heading (h2 or h3)', async () => {
+    installAllHarnessMocks();
+    render(<HarnessDashboard />);
+    const heading = await screen.findByRole('heading', { name: /Failure Log タイムライン/ });
+    expect(heading).toBeInTheDocument();
+    // AC-A2: heading level is h2 or h3
+    expect(['H2', 'H3']).toContain(heading.tagName);
+  });
+
+  // AC-H1: bar elements exist in a11y tree
+  it('AC-H1: renders bar elements with accessible labels for each date', async () => {
+    installAllHarnessMocks();
+    render(<HarnessDashboard />);
+    // Wait for bars to appear. Each bar should have an aria-label like "2026-04-09: 1件"
+    const bar1 = await screen.findByLabelText('2026-04-09: 1件');
+    const bar2 = screen.getByLabelText('2026-04-10: 3件');
+    expect(bar1).toBeInTheDocument();
+    expect(bar2).toBeInTheDocument();
+  });
+
+  // AC-E3: empty entries shows "No data" message
+  it('AC-E3: shows "No data" message when entries is empty', async () => {
+    installAllHarnessMocks({ timeline: { entries: [] } });
+    render(<HarnessDashboard />);
+    await waitFor(() => {
+      expect(screen.getByText(/No data/i)).toBeInTheDocument();
+    });
+  });
+
+  // AC-R1: timeline fetch error shows error message
+  it('AC-R1: shows error message when timeline fetch fails', async () => {
+    installFetch((url) => {
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse({ error: 'boom' }, 500);
+      }
+      if (url.includes('/api/harness/failure-log')) {
+        return jsonResponse(MOCK_FAILURE_LOG);
+      }
+      if (url.includes('/api/harness/exec-plans')) {
+        return jsonResponse(MOCK_EXEC_PLANS);
+      }
+      if (url.includes('/api/harness/core-beliefs')) {
+        return jsonResponse(MOCK_CORE_BELIEFS);
+      }
+      return jsonResponse({}, 500);
+    });
+
+    render(<HarnessDashboard />);
+
+    await waitFor(() => {
+      const section = screen.getByTestId('section-failure-log-timeline');
+      expect(section.textContent ?? '').toMatch(/取得できません/);
+    });
+  });
+});
+
 describe('App navigation', () => {
   it('AC-H: renders a navigation with Docs and Harness labels inside a <nav>', async () => {
     installFetch((url) => {
@@ -214,6 +322,9 @@ describe('App navigation', () => {
       }
       if (url.includes('/api/content')) {
         return textResponse('# hello');
+      }
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse({ entries: [] });
       }
       if (url.includes('/api/harness/failure-log')) {
         return jsonResponse({
@@ -224,10 +335,10 @@ describe('App navigation', () => {
         });
       }
       if (url.includes('/api/harness/exec-plans')) {
-        return jsonResponse({ active: [], completed: [] });
+        return jsonResponse(MOCK_EXEC_PLANS);
       }
       if (url.includes('/api/harness/core-beliefs')) {
-        return jsonResponse({ entries: [] });
+        return jsonResponse(MOCK_CORE_BELIEFS);
       }
       return jsonResponse({}, 500);
     });
@@ -252,19 +363,17 @@ describe('App navigation', () => {
       if (url.includes('/api/content')) {
         return textResponse('# hello');
       }
+      if (url.includes('/api/harness/failure-log/timeline')) {
+        return jsonResponse(MOCK_TIMELINE);
+      }
       if (url.includes('/api/harness/failure-log')) {
-        return jsonResponse({
-          byStatus: { open: 1 },
-          byCategory: { frontend: 1 },
-          totalValid: 1,
-          totalInvalid: 0,
-        });
+        return jsonResponse(MOCK_FAILURE_LOG);
       }
       if (url.includes('/api/harness/exec-plans')) {
-        return jsonResponse({ active: [], completed: [] });
+        return jsonResponse(MOCK_EXEC_PLANS);
       }
       if (url.includes('/api/harness/core-beliefs')) {
-        return jsonResponse({ entries: [] });
+        return jsonResponse(MOCK_CORE_BELIEFS);
       }
       return jsonResponse({}, 500);
     });

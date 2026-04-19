@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
-import { fetchHarnessFailureLog, fetchHarnessExecPlans, fetchHarnessCoreBeliefs } from '../api';
-import type { HarnessFailureLog, HarnessExecPlans, HarnessCoreBeliefs } from '../types';
+import {
+  fetchHarnessFailureLog,
+  fetchHarnessFailureLogTimeline,
+  fetchHarnessExecPlans,
+  fetchHarnessCoreBeliefs,
+} from '../api';
+import type {
+  HarnessFailureLog,
+  HarnessFailureLogTimeline,
+  HarnessExecPlans,
+  HarnessCoreBeliefs,
+} from '../types';
 
 /**
  * ハーネス観測ダッシュボード。
@@ -20,6 +30,9 @@ type Section<T> =
 
 export function HarnessDashboard() {
   const [failureLog, setFailureLog] = useState<Section<HarnessFailureLog>>({ status: 'loading' });
+  const [timeline, setTimeline] = useState<Section<HarnessFailureLogTimeline>>({
+    status: 'loading',
+  });
   const [execPlans, setExecPlans] = useState<Section<HarnessExecPlans>>({ status: 'loading' });
   const [coreBeliefs, setCoreBeliefs] = useState<Section<HarnessCoreBeliefs>>({
     status: 'loading',
@@ -35,6 +48,24 @@ export function HarnessDashboard() {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : 'unknown error';
           setFailureLog({ status: 'error', message });
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchHarnessFailureLogTimeline();
+        if (!cancelled) setTimeline({ status: 'success', data });
+      } catch (err) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'unknown error';
+          setTimeline({ status: 'error', message });
         }
       }
     })();
@@ -133,6 +164,50 @@ export function HarnessDashboard() {
             </div>
           </div>
         )}
+      </section>
+
+      {/* --- Section: Failure Log Timeline ---------------------------------- */}
+      <section
+        data-testid="section-failure-log-timeline"
+        aria-labelledby="section-failure-log-timeline-heading"
+      >
+        <h2
+          id="section-failure-log-timeline-heading"
+          className="text-xl font-bold border-b border-gray-300 pb-2 mb-3"
+        >
+          Failure Log タイムライン
+        </h2>
+        {timeline.status === 'loading' && <p className="text-gray-500 text-sm">読み込み中…</p>}
+        {timeline.status === 'error' && (
+          <p className="text-red-600 text-sm">
+            タイムラインを取得できませんでした（{timeline.message}）
+          </p>
+        )}
+        {timeline.status === 'success' && timeline.data.entries.length === 0 && (
+          <p className="text-gray-500 text-sm">No data</p>
+        )}
+        {timeline.status === 'success' &&
+          timeline.data.entries.length > 0 &&
+          (() => {
+            const maxCount = Math.max(...timeline.data.entries.map((e) => e.count));
+            return (
+              <div className="flex items-end gap-1" style={{ height: '120px' }}>
+                {timeline.data.entries.map((entry) => {
+                  const heightPct = maxCount > 0 ? (entry.count / maxCount) * 100 : 0;
+                  return (
+                    <div
+                      key={entry.date}
+                      className="flex-1 bg-blue-500 rounded-t min-w-2"
+                      style={{ height: `${heightPct}%` }}
+                      aria-label={`${entry.date}: ${entry.count}件`}
+                      role="img"
+                      title={`${entry.date}: ${entry.count}件`}
+                    />
+                  );
+                })}
+              </div>
+            );
+          })()}
       </section>
 
       {/* --- Section 2: Exec Plans ---------------------------------------- */}

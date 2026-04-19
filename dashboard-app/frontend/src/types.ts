@@ -41,6 +41,15 @@ export type HarnessFailureLog = {
   totalInvalid: number;
 };
 
+export type HarnessFailureLogTimelineEntry = {
+  date: string;
+  count: number;
+};
+
+export type HarnessFailureLogTimeline = {
+  entries: HarnessFailureLogTimelineEntry[];
+};
+
 export type HarnessExecPlanEntry = {
   file: string;
   title: string;

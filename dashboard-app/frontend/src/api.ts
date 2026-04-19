@@ -2,6 +2,7 @@ import type {
   FileTree,
   SearchResult,
   HarnessFailureLog,
+  HarnessFailureLogTimeline,
   HarnessExecPlans,
   HarnessCoreBeliefs,
 } from './types';
@@ -65,6 +66,18 @@ export async function fetchHarnessFailureLog(): Promise<HarnessFailureLog> {
     throw new Error('invalid response shape');
   }
   return json as HarnessFailureLog;
+}
+
+export async function fetchHarnessFailureLogTimeline(): Promise<HarnessFailureLogTimeline> {
+  const res = await fetch('/api/harness/failure-log/timeline');
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  if (!hasOwn(json, 'entries') || !Array.isArray((json as { entries: unknown }).entries)) {
+    throw new Error('invalid response shape');
+  }
+  return json as HarnessFailureLogTimeline;
 }
 
 export async function fetchHarnessExecPlans(): Promise<HarnessExecPlans> {

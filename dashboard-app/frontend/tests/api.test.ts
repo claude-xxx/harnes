@@ -4,6 +4,7 @@ import {
   fetchContent,
   searchContent,
   fetchHarnessFailureLog,
+  fetchHarnessFailureLogTimeline,
   fetchHarnessExecPlans,
   fetchHarnessCoreBeliefs,
 } from '../src/api';
@@ -109,6 +110,26 @@ describe('fetchHarnessFailureLog', () => {
   it('throws on invalid shape', async () => {
     mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({}) });
     await expect(fetchHarnessFailureLog()).rejects.toThrow(/invalid response shape/);
+  });
+});
+
+describe('fetchHarnessFailureLogTimeline', () => {
+  it('returns parsed body on 200', async () => {
+    const body = { entries: [{ date: '2026-04-09', count: 2 }] };
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve(body) });
+    const res = await fetchHarnessFailureLogTimeline();
+    expect(res).toEqual(body);
+    expect(mockFetch).toHaveBeenCalledWith('/api/harness/failure-log/timeline');
+  });
+
+  it('throws on non-ok', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, json: () => Promise.resolve({}) });
+    await expect(fetchHarnessFailureLogTimeline()).rejects.toThrow('HTTP 500');
+  });
+
+  it('throws on invalid shape', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({}) });
+    await expect(fetchHarnessFailureLogTimeline()).rejects.toThrow(/invalid response shape/);
   });
 });
 

@@ -63,6 +63,51 @@ export function aggregateFailureLog(jsonlText: string): FailureLogAggregate {
   return { byStatus, byCategory, totalValid, totalInvalid };
 }
 
+export type FailureLogTimelineEntry = {
+  date: string;
+  count: number;
+};
+
+export type FailureLogTimeline = {
+  entries: FailureLogTimelineEntry[];
+};
+
+/**
+ * failure-log.jsonl 全体を 1 つの文字列として食い、日付別の件数を集計して昇順で返す。
+ *
+ * - 空行・JSON パース失敗行はスキップ
+ * - `date` フィールドが欠損または YYYY-MM-DD 形式でないレコードはスキップ
+ * - 同一日付のレコードは合算
+ * - 結果は日付昇順でソート
+ */
+export function aggregateFailureLogTimeline(jsonlText: string): FailureLogTimeline {
+  const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+  const countByDate: Record<string, number> = {};
+
+  const lines = jsonlText.split(/\r?\n/);
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (line === '') continue;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (parsed === null || typeof parsed !== 'object') continue;
+    const rec = parsed as Record<string, unknown>;
+    const date = typeof rec.date === 'string' ? rec.date : null;
+    if (date === null || !datePattern.test(date)) continue;
+    countByDate[date] = (countByDate[date] ?? 0) + 1;
+  }
+
+  const entries = Object.entries(countByDate)
+    .map(([date, count]) => ({ date, count }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  return { entries };
+}
+
 export type ExecPlanSummary = {
   file: string;
   title: string;

@@ -1,10 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import { app } from '../src/app.js';
-import { aggregateFailureLog, parseExecPlan, aggregateCoreBeliefs } from '../src/lib/harness.js';
+import {
+  aggregateFailureLog,
+  parseExecPlan,
+  aggregateCoreBeliefs,
+  aggregateFailureLogTimeline,
+} from '../src/lib/harness.js';
 import {
   HarnessFailureLogSchema,
   HarnessExecPlansSchema,
   HarnessCoreBeliefsSchema,
+  HarnessFailureLogTimelineSchema,
 } from '../src/schemas/api.js';
 
 /**
@@ -191,6 +197,116 @@ describe('GET /api/harness/exec-plans', () => {
   // covers the non-empty path; a formalized empty-dir test was removed as it
   // degenerated into an empty-vs-empty assertion. If a test fs harness is
   // introduced later, re-add a directory-level empty case here.
+});
+
+/* ------------------------------------------------------------------ */
+/*        aggregateFailureLogTimeline — pure function unit tests        */
+/* ------------------------------------------------------------------ */
+
+describe('aggregateFailureLogTimeline', () => {
+  // AC-E1: empty input returns empty entries
+  it('returns empty entries for empty input (AC-E1)', () => {
+    const result = aggregateFailureLogTimeline('');
+    expect(result.entries).toEqual([]);
+  });
+
+  // AC-H2 + AC-H3: valid records produce date-count pairs sorted ascending
+  it('aggregates by date and sorts ascending (AC-H2, AC-H3)', () => {
+    const jsonl = [
+      '{"date":"2026-04-10","status":"open","category":"frontend"}',
+      '{"date":"2026-04-09","status":"open","category":"backend"}',
+      '{"date":"2026-04-10","status":"promoted","category":"tooling"}',
+    ].join('\n');
+
+    const result = aggregateFailureLogTimeline(jsonl);
+    expect(result.entries).toEqual([
+      { date: '2026-04-09', count: 1 },
+      { date: '2026-04-10', count: 2 },
+    ]);
+  });
+
+  // AC-E2: records with missing date are skipped
+  it('skips records without a date field (AC-E2)', () => {
+    const jsonl = [
+      '{"date":"2026-04-09","status":"open","category":"frontend"}',
+      '{"status":"open","category":"backend"}',
+      '{"date":"2026-04-09","status":"promoted","category":"tooling"}',
+    ].join('\n');
+
+    const result = aggregateFailureLogTimeline(jsonl);
+    expect(result.entries).toEqual([{ date: '2026-04-09', count: 2 }]);
+  });
+
+  // AC-E2: records with invalid date format are skipped
+  it('skips records with invalid date format (AC-E2)', () => {
+    const jsonl = [
+      '{"date":"2026-04-09","status":"open","category":"frontend"}',
+      '{"date":"not-a-date","status":"open","category":"backend"}',
+      '{"date":"2026/04/10","status":"open","category":"tooling"}',
+    ].join('\n');
+
+    const result = aggregateFailureLogTimeline(jsonl);
+    expect(result.entries).toEqual([{ date: '2026-04-09', count: 1 }]);
+  });
+
+  // AC-E4: same date multiple records are summed
+  it('sums counts for the same date (AC-E4)', () => {
+    const jsonl = [
+      '{"date":"2026-04-09","status":"open","category":"frontend"}',
+      '{"date":"2026-04-09","status":"open","category":"backend"}',
+      '{"date":"2026-04-09","status":"promoted","category":"tooling"}',
+    ].join('\n');
+
+    const result = aggregateFailureLogTimeline(jsonl);
+    expect(result.entries).toEqual([{ date: '2026-04-09', count: 3 }]);
+  });
+
+  it('skips malformed JSON lines', () => {
+    const jsonl = [
+      '{"date":"2026-04-09","status":"open"}',
+      'not-json',
+      '{"date":"2026-04-10","status":"open"}',
+    ].join('\n');
+
+    const result = aggregateFailureLogTimeline(jsonl);
+    expect(result.entries).toEqual([
+      { date: '2026-04-09', count: 1 },
+      { date: '2026-04-10', count: 1 },
+    ]);
+  });
+
+  it('ignores blank lines', () => {
+    const jsonl = '{"date":"2026-04-09","status":"open"}\n\n';
+    const result = aggregateFailureLogTimeline(jsonl);
+    expect(result.entries).toEqual([{ date: '2026-04-09', count: 1 }]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/*        GET /api/harness/failure-log/timeline — contract test        */
+/* ------------------------------------------------------------------ */
+
+describe('GET /api/harness/failure-log/timeline', () => {
+  // AC-H2: returns 200 with body matching schema
+  it('returns 200 with a body matching HarnessFailureLogTimelineSchema (AC-H2)', async () => {
+    const res = await get('/api/harness/failure-log/timeline');
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    const parsed = HarnessFailureLogTimelineSchema.parse(json);
+    expect(Array.isArray(parsed.entries)).toBe(true);
+  });
+
+  // AC-H3: entries are sorted by date ascending
+  it('returns entries sorted by date ascending (AC-H3)', async () => {
+    const res = await get('/api/harness/failure-log/timeline');
+    const json = await res.json();
+    const parsed = HarnessFailureLogTimelineSchema.parse(json);
+    if (parsed.entries.length >= 2) {
+      for (let i = 1; i < parsed.entries.length; i++) {
+        expect(parsed.entries[i].date >= parsed.entries[i - 1].date).toBe(true);
+      }
+    }
+  });
 });
 
 describe('GET /api/harness/core-beliefs', () => {

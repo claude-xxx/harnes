@@ -12,6 +12,7 @@ import {
   SearchQuerySchema,
   SearchResultSchema,
   HarnessFailureLogSchema,
+  HarnessFailureLogTimelineSchema,
   HarnessExecPlansSchema,
   HarnessCoreBeliefsSchema,
   type FileNode,
@@ -19,6 +20,7 @@ import {
 import { resolveWithinContent, InvalidPathError } from './lib/safePath.js';
 import {
   aggregateFailureLog,
+  aggregateFailureLogTimeline,
   parseExecPlan,
   aggregateCoreBeliefs,
   type ExecPlanSummary,
@@ -344,6 +346,26 @@ const harnessFailureLogRoute = createRoute({
   },
 });
 
+const harnessFailureLogTimelineRoute = createRoute({
+  method: 'get',
+  path: '/api/harness/failure-log/timeline',
+  tags: ['harness'],
+  summary: 'Failure log timeline',
+  description:
+    'Reads docs/failure-log.jsonl and returns daily failure counts sorted by date ascending. ' +
+    'Records without a valid YYYY-MM-DD date field are skipped.',
+  responses: {
+    200: {
+      description: 'Daily failure counts',
+      content: { 'application/json': { schema: HarnessFailureLogTimelineSchema } },
+    },
+    500: {
+      description: 'Failed to read or aggregate the failure log',
+      content: { 'application/json': { schema: ErrorSchema } },
+    },
+  },
+});
+
 const harnessExecPlansRoute = createRoute({
   method: 'get',
   path: '/api/harness/exec-plans',
@@ -418,6 +440,27 @@ app.openapi(harnessFailureLogRoute, async (c) => {
   } catch (err) {
     console.error('Failed to aggregate failure log:', err);
     return c.json({ error: 'failed to aggregate failure log' }, 500);
+  }
+});
+
+app.openapi(harnessFailureLogTimelineRoute, async (c) => {
+  try {
+    let text = '';
+    try {
+      const absPath = await resolveWithinContent(DOCS_DIR, 'failure-log.jsonl');
+      text = await readFile(absPath, 'utf-8');
+    } catch (err) {
+      if (
+        !(err instanceof Error && 'code' in err && (err as NodeJS.ErrnoException).code === 'ENOENT')
+      ) {
+        throw err;
+      }
+    }
+    const timeline = aggregateFailureLogTimeline(text);
+    return c.json(timeline, 200);
+  } catch (err) {
+    console.error('Failed to aggregate failure log timeline:', err);
+    return c.json({ error: 'failed to aggregate failure log timeline' }, 500);
   }
 });
 
